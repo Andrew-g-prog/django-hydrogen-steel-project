@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# build.sh
-set -o errexit
+set -euo pipefail
 
+python -m pip install --upgrade pip
 pip install -r requirements.txt
+
+# collect static for WhiteNoise
 python manage.py collectstatic --noinput
-python manage.py migrate
