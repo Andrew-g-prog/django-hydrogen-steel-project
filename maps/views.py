@@ -1,7 +1,57 @@
+# --- Fast Excel loading (drop-in) --------------------------------------------
 from django.shortcuts import render
 from pathlib import Path
 import pandas as pd
 import re
+
+from functools import lru_cache
+from typing import Tuple
+
+# Point to your Excel once
+DATA_XLSX = Path(__file__).resolve().parent.parent / "data" / "data_final.xlsx"
+
+# Keep original pandas reader so we can fall back for other files
+_ORIG_READ_EXCEL = pd.read_excel
+
+def _file_sig(path: Path) -> Tuple[int, float]:
+    """
+    Lightweight file signature (size, mtime) so the cache invalidates automatically
+    when data_final.xlsx changes (e.g., you upload a new version).
+    """
+    try:
+        st = path.stat()
+        return (st.st_size, st.st_mtime)
+    except FileNotFoundError:
+        return (0, 0.0)
+
+@lru_cache(maxsize=32)
+def _read_excel_cached(sig: Tuple[int, float], sheet_name: str):
+    """
+    Cached sheet reader keyed by (file_signature, sheet_name).
+    First request pays the read cost; subsequent requests are memory-fast.
+    """
+    # Use openpyxl engine explicitly for .xlsx (already in your requirements).
+    return _ORIG_READ_EXCEL(DATA_XLSX, sheet_name=sheet_name, engine="openpyxl")
+
+def _is_same_path(io) -> bool:
+    try:
+        return Path(io).resolve() == DATA_XLSX.resolve()
+    except Exception:
+        return False
+
+def cached_read_excel(io, *args, **kwargs):
+    """
+    Transparent replacement for pd.read_excel that caches reads for your main Excel file.
+    - If the call targets DATA_XLSX and provides sheet_name -> cached path
+    - Otherwise, delegate to pandas' original reader unchanged
+    """
+    sheet_name = kwargs.get("sheet_name")
+    if sheet_name is not None and _is_same_path(io):
+        return _read_excel_cached(_file_sig(DATA_XLSX), sheet_name)
+    return _ORIG_READ_EXCEL(io, *args, **kwargs)
+
+# Monkey-patch pandas so the rest of your file can stay exactly the same.
+pd.read_excel = cached_read_excel
 
 # ---------- HYDROGEN (with End-Use filter data) ----------
 def hydrogen(request):
