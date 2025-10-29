@@ -1,0 +1,842 @@
+{% extends "maps/base.html" %}
+{% block title %}Hydrogen{% endblock %}
+{% block tab_hydrogen %}active{% endblock %}
+
+{% block extra_head %}
+<style>
+  /* ===== Popup styling ===== */
+  .popup-card {
+    min-width: 340px;
+    font-size: 13px;
+    line-height: 1.45;
+  }
+  .popup-title {
+    font-weight: 800;
+    font-size: 16px;
+    margin: 0 0 6px;
+  }
+  .meta-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 8px;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    border: 1px solid #ddd;
+    font-weight: 700;
+    font-size: 11px;
+    letter-spacing: .2px;
+    background: #f3f4f6;
+    color: #111;
+  }
+  .badge .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    background: currentColor;
+  }
+  .sub {
+    color: #4b5563;
+    font-weight: 600;
+    background: #f3f4f6;
+    border-radius: 6px;
+    padding: 2px 6px;
+    font-size: 11px;
+  }
+
+  .section-title {
+    margin: 10px 0 6px;
+    font-weight: 800;
+    font-size: 12px;
+    text-transform: uppercase;
+    color: #111;
+    letter-spacing: .4px;
+  }
+  .spec-grid {
+    display: grid;
+    grid-template-columns: 140px 1fr;
+    gap: 6px 10px;
+  }
+  .spec-k {
+    color: #6b7280;
+    font-weight: 700;
+  }
+  .spec-v {
+    color: #111;
+    font-weight: 600;
+  }
+
+  .caps-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-variant-numeric: tabular-nums;
+  }
+  .caps-table th,
+  .caps-table td {
+    padding: 6px 6px;
+    border-bottom: 1px solid #e5e7eb;
+    text-align: left;
+  }
+  .caps-table th {
+    color: #6b7280;
+    font-weight: 800;
+    font-size: 11px;
+    text-transform: uppercase;
+  }
+  .caps-unit {
+    color: #6b7280;
+    font-weight: 700;
+    font-size: 11px;
+  }
+
+  .chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .chip {
+    background: #eef2ff;
+    color: #1f2937;
+    border-radius: 999px;
+    padding: 3px 8px;
+    font-weight: 700;
+    font-size: 11px;
+    border: 1px solid #e5e7eb;
+  }
+  .chips .sub {
+    background: transparent;
+    border-radius: 0;
+    padding: 0;
+  }
+
+  /* ===== Map controls (filters / toggles on top-right) ===== */
+  .size-control {
+    background: rgba(17,17,17,0.92);
+    color: #fff;
+    padding: 10px 12px;
+    border-radius: 10px;
+    box-shadow: 0 6px 16px rgba(0,0,0,0.25);
+    font-size: 12px;
+    min-width: 320px;
+  }
+  .size-control .row { margin-bottom: 8px; }
+  .toggle {
+    display: inline-flex;
+    gap: 6px;
+    background: #0f0f0f;
+    padding: 4px;
+    border-radius: 10px;
+    border: 1px solid #2a2a2a;
+  }
+  .toggle button {
+    appearance: none;
+    border: 0;
+    padding: 6px 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    background: transparent;
+    color: #ddd;
+    font-weight: 600;
+  }
+  .toggle button.active {
+    background: #1f1f1f;
+    color: #fff;
+  }
+
+  .size-control label {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 600;
+  }
+  .size-control select {
+    width: 100%;
+    padding: 6px 8px;
+    border-radius: 8px;
+    border: 1px solid #333;
+    background: #1f1f1f;
+    color: #fff;
+  }
+  .status-list,
+  .tech-list,
+  .enduse-list {
+    max-height: 200px;
+    overflow: auto;
+    padding-right: 4px;
+    margin-top: 6px;
+  }
+  .status-item,
+  .tech-item,
+  .enduse-item {
+    display: flex;
+    align-items: start;
+    gap: 8px;
+    margin: 4px 0;
+  }
+  .swatch {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+    border: 1px solid rgba(255,255,255,0.5);
+  }
+  .desc {
+    color: #b9b9b9;
+    font-size: 11px;
+    line-height: 1.3;
+    margin-left: 22px;
+  }
+  .menu-sep {
+    border: 0;
+    border-top: 1px solid #2a2a2a;
+    margin: 8px 0;
+  }
+
+  /* ===== Search bar (top center) ===== */
+  .search-wrapper {
+    position: absolute;
+    z-index: 1000;
+    top: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 320px;
+    max-width: calc(100% - 24px);
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Inter", Roboto, sans-serif;
+  }
+
+  /* Make the outer box the visual pill */
+  .search-box {
+    background: rgba(17,17,17,0.92);
+    border: 1px solid #2a2a2a;
+    border-radius: 12px;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+    padding: 8px 10px;
+    color: #fff;
+  }
+
+  /* Input is now borderless and transparent so it doesn't create a 2nd rounded box */
+  .search-box input {
+    background: transparent;
+    color: #fff;
+    border: 0;
+    outline: none;
+    width: 100%;
+    font-size: 13px;
+    line-height: 1.4;
+    padding: 0;
+  }
+  .search-box input::placeholder {
+    color: #9ca3af;
+  }
+
+  /* Suggestions dropdown attaches below outer pill */
+  .search-suggestions {
+    background: rgba(17,17,17,0.95);
+    border: 1px solid #2a2a2a;
+    border-radius: 10px;
+    margin-top: 6px;
+    max-height: 200px;
+    overflow-y: auto;
+    box-shadow: 0 12px 24px rgba(0,0,0,0.6);
+  }
+  .search-item {
+    padding: 8px 10px;
+    cursor: pointer;
+    color: #fff;
+    font-size: 12px;
+    line-height: 1.4;
+    display: flex;
+    flex-direction: column;
+  }
+  .search-item:hover,
+  .search-item.active {
+    background: #2a2a2a;
+  }
+  .search-main {
+    font-weight: 600;
+    color: #fff;
+  }
+  .search-sub {
+    font-size: 11px;
+    color: #9ca3af;
+    margin-top: 2px;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+  <!-- search overlay -->
+  <div class="search-wrapper">
+    <div class="search-box">
+      <input
+        id="project-search-input"
+        type="text"
+        placeholder="Search project…"
+        autocomplete="off"
+      />
+    </div>
+    <div id="search-suggestions" class="search-suggestions" style="display:none;"></div>
+  </div>
+
+  <!-- map -->
+  <div id="map"></div>
+
+  {{ projects|json_script:"hydro-data" }}
+  {{ statuses|json_script:"hydro-statuses" }}
+
+  <script>
+    /***********************
+     * MAP INITIALIZATION  *
+     ***********************/
+    const map = L.map('map', { zoomControl: true });
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+      maxZoom: 20,
+      attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
+    }).addTo(map);
+    L.control.scale({ metric: true, imperial: false }).addTo(map);
+    map.setView([54, 15], 4); // Europe
+
+    const LAT_MIN = -85, LAT_MAX = 85;
+    function clampLat(lat) {
+      return Math.max(LAT_MIN, Math.min(LAT_MAX, lat));
+    }
+    map.on('moveend', () => {
+      const c = map.getCenter();
+      const clamped = clampLat(c.lat);
+      if (clamped !== c.lat) {
+        map.setView([clamped, c.lng], map.getZoom(), { animate: false });
+      }
+    });
+
+    const LONG_OFFSETS = [-360, 0, 360];
+
+    /***********************
+     * DATA
+     ***********************/
+    const projects = JSON.parse(document.getElementById('hydro-data').textContent || '[]');
+    const allStatuses = JSON.parse(document.getElementById('hydro-statuses').textContent || '[]');
+
+    /***********************
+     * VISUAL CONSTANTS
+     ***********************/
+    const palette = ['#5aa9ff','#1f6feb','#00c49a','#ffbb28','#ff8042','#a29bfe','#ff6b6b','#7dd3fc','#a3e635','#f472b6'];
+    const statusColor = {};
+    allStatuses.forEach((s, i) => statusColor[s] = palette[i % palette.length]);
+
+    const metrics = [
+      { key: 'announced_mw',  label: 'Announced Size (Megawatts)' },
+      { key: 'capacity_mwel', label: 'Megawatts-Electric (MWel) Capacity' },
+      { key: 'capacity_nm3ph',label: 'Normal Cubic Meter Of Hydrogen H2 Capacity' },
+      { key: 'capacity_ktpy', label: 'Kilotonnes Of Hydrogen Per Year Capacity' },
+    ];
+
+    const TECHNOLOGIES = [
+      { key: 'AEM', label: 'AEM', desc: 'Anion exchange membrane electrolysis.' },
+      { key: 'ALK', label: 'ALK', desc: 'Alkaline electrolysis.' },
+      { key: 'Biomass', label: 'Biomass', desc: 'Biomass-based technologies (e.g., gasification/pyrolysis).' },
+      { key: 'Biomass w CCUS', label: 'Biomass w CCUS', desc: 'Biomass routes with CO₂ capture.' },
+      { key: 'Coal w CCUS', label: 'Coal w CCUS', desc: 'Coal gasification + CO₂ capture.' },
+      { key: 'NG w CCUS', label: 'NG w CCUS', desc: 'Natural gas reforming + CO₂ capture.' },
+      { key: 'Oil w CCUS', label: 'Oil w CCUS', desc: 'Oil-based reforming/cracking + CO₂ capture.' },
+      { key: 'Other', label: 'Other', desc: 'Other technologies (e.g. pyro-electrocatalysis).' },
+      { key: 'Other Electrolysis', label: 'Other Electrolysis', desc: 'Electrolysis type undisclosed / Unknown PtX.' },
+      { key: 'PEM', label: 'PEM', desc: 'Proton exchange membrane electrolysis.' },
+      { key: 'SOEC', label: 'SOEC', desc: 'Solid oxide electrolysis cells.' },
+    ];
+
+    function normalizeTech(raw) {
+      const s = (raw || '').toString().trim();
+      if (!s || s.toLowerCase() === 'no data') return 'Other';
+      const u = s.toUpperCase();
+      if (u.includes('AEM')) return 'AEM';
+      if (u.includes('ALK')) return 'ALK';
+      if (u.includes('PEM')) return 'PEM';
+      if (u.includes('SOEC')) return 'SOEC';
+      if (u.includes('BIOMASS') && u.includes('CCUS')) return 'Biomass w CCUS';
+      if (u.includes('BIOMASS')) return 'Biomass';
+      if (u.includes('COAL') && u.includes('CCUS')) return 'Coal w CCUS';
+      if ((u.includes('NG') || u.includes('NATURAL GAS')) && u.includes('CCUS')) return 'NG w CCUS';
+      if (u.includes('OIL') && u.includes('CCUS')) return 'Oil w CCUS';
+      if (u.includes('UNKNOWN') || u.includes('PTX') || u.includes('OTHER ELECTROLYSIS')) return 'Other Electrolysis';
+      if (u.includes('OTHER')) return 'Other';
+      return 'Other';
+    }
+
+    const endUses = [
+      { key: 'eu_refining',       label: 'Refining' },
+      { key: 'eu_ammonia',        label: 'Ammonia' },
+      { key: 'eu_methanol',       label: 'Methanol' },
+      { key: 'eu_iron_steel',     label: 'Iron & Steel' },
+      { key: 'eu_other_ind',      label: 'Other Ind' },
+      { key: 'eu_mobility',       label: 'Mobility' },
+      { key: 'eu_power',          label: 'Power' },
+      { key: 'eu_grid_inj',       label: 'Grid inj.' },
+      { key: 'eu_chp',            label: 'CHP' },
+      { key: 'eu_domestic_heat',  label: 'Domestic heat' },
+      { key: 'eu_biofuels',       label: 'Biofuels' },
+      { key: 'eu_synfuels',       label: 'Synfuels' },
+      { key: 'eu_ch4_grid_inj',   label: 'CH₄ grid inj.' },
+      { key: 'eu_ch4_mobility',   label: 'CH₄ mobility' },
+    ];
+
+    /***********************
+     * HELPERS
+     ***********************/
+    function hexToRgba(hex,a){
+      const m=/^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex||'');
+      if(!m) return 'rgba(31,111,235,0.12)';
+      const r=parseInt(m[1],16),g=parseInt(m[2],16),b=parseInt(m[3],16);
+      return `rgba(${r},${g},${b},${a})`;
+    }
+    function escapeHtml(s){
+      s=(s===null||s===undefined)?'No data':String(s);
+      return s.replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+    }
+    function formatNum(x, digits=2){
+      try { return new Intl.NumberFormat('en-US',{maximumFractionDigits:digits}).format(x); }
+      catch { return String(x); }
+    }
+    function unitCell(value, unit){
+      if (value===null || value===undefined || value==='' || Number.isNaN(value)) return 'No data';
+      return `${formatNum(value)} <span class="caps-unit">${unit}</span>`;
+    }
+    function coords(lat,lng){
+      return (lat!=null && lng!=null)
+        ? `${formatNum(lat,3)}°, ${formatNum(lng,3)}°`
+        : 'No data';
+    }
+    function endUseChips(p){
+      const list = endUses
+        .filter(eu => p.eu && p.eu[eu.key])
+        .map(eu => `<span class="chip">${eu.label}</span>`);
+      return list.length
+        ? list.join('')
+        : '<span class="sub">No end-use specified</span>';
+    }
+
+    function popupHtml(p){
+      const statusClr = statusColor[p.status] || '#1f6feb';
+      const techNorm = normalizeTech(p.technology);
+
+      return `
+        <div class="popup-card">
+          <div class="popup-title">${escapeHtml(p.name !== 'No data' ? p.name : 'Hydrogen project')}</div>
+
+          <div class="meta-row">
+            <span class="badge" style="color:${statusClr}; border-color:${statusClr}; background:${hexToRgba(statusClr,0.1)}">
+              <span class="dot"></span> ${escapeHtml(p.status)}
+            </span>
+            <span class="sub">Tech: ${escapeHtml(techNorm)}</span>
+            <span class="sub">Country: ${escapeHtml(p.country)}</span>
+          </div>
+
+          <div class="section-title">Overview</div>
+          <div class="spec-grid">
+            <div class="spec-k">Location</div><div class="spec-v">${escapeHtml(p.location_name)}</div>
+            <div class="spec-k">Coordinates</div><div class="spec-v">${coords(p.lat,p.lng)}</div>
+            <div class="spec-k">Date Online</div><div class="spec-v">${escapeHtml(p.date_online)}</div>
+            <div class="spec-k">Decommission</div><div class="spec-v">${escapeHtml(p.decom_date)}</div>
+            <div class="spec-k">Technology</div><div class="spec-v">${escapeHtml(p.technology)}</div>
+            <div class="spec-k">ID</div><div class="spec-v">${escapeHtml(p.id)}</div>
+          </div>
+
+          <div class="section-title">Capacity</div>
+          <table class="caps-table">
+            <thead><tr><th>Metric</th><th>Value</th></tr></thead>
+            <tbody>
+              <tr><td>Announced Size</td><td>${unitCell(p.announced_mw,'MW')}</td></tr>
+              <tr><td>MWel Capacity</td><td>${unitCell(p.capacity_mwel,'MWel')}</td></tr>
+              <tr><td>Hydrogen Flow</td><td>${unitCell(p.capacity_nm3ph,'Nm³ H₂/h')}</td></tr>
+              <tr><td>Hydrogen per Year</td><td>${unitCell(p.capacity_ktpy,'kt H₂/y')}</td></tr>
+            </tbody>
+          </table>
+
+          <div class="section-title">End-Use</div>
+          <div class="chips">${endUseChips(p)}</div>
+
+          <div class="section-title">Comments</div>
+          <div>${escapeHtml(p.comments)}</div>
+        </div>
+      `;
+    }
+
+    function computeDomain(metricKey) {
+      const vals = projects
+        .map(p => p[metricKey])
+        .filter(v => v !== null && !isNaN(v) && isFinite(v));
+      if (!vals.length) return {min:0,max:1};
+      return {min: Math.min(...vals), max: Math.max(...vals)};
+    }
+    function radiusFor(value, domain) {
+      const rMin = 4, rMax = 26;
+      if (value===null || isNaN(value) || !isFinite(value)) return rMin;
+      if (domain.max === domain.min) return (rMin+rMax)/2;
+      const t = (value-domain.min)/(domain.max-domain.min);
+      return rMin + t*(rMax-rMin);
+    }
+
+    /***********************
+     * FILTER CONTROL (top-right)
+     ***********************/
+    const SizeControl = L.Control.extend({
+      options: { position: 'topright' },
+      onAdd: function() {
+        const div = L.DomUtil.create('div', 'leaflet-bar size-control');
+        div.innerHTML = `
+          <div class="row">
+            <div class="toggle" role="tablist" aria-label="Rendering Mode">
+              <button id="btn-circles" type="button">Circles</button>
+              <button id="btn-points" class="active" type="button">Points</button>
+            </div>
+          </div>
+
+          <div class="row" style="margin-top:6px; font-weight:600;">Status Filter</div>
+          <div class="status-list" id="status-list"></div>
+
+          <hr class="menu-sep" />
+
+          <div class="row" style="margin-top:6px; font-weight:600;">Technology Filter</div>
+          <div class="tech-list" id="tech-list"></div>
+
+          <hr class="menu-sep" />
+
+          <div class="row" style="margin-top:6px; font-weight:600;">End-Use Filter</div>
+          <div class="enduse-list" id="enduse-list"></div>
+
+          <hr class="menu-sep" />
+
+          <div class="row" id="metric-row" style="display:none;">
+            <label>Circle Size By</label>
+            <select id="metric-select">
+              ${metrics.map(m => `<option value="${m.key}">${m.label}</option>`).join('')}
+            </select>
+          </div>
+        `;
+        L.DomEvent.disableClickPropagation(div);
+        L.DomEvent.disableScrollPropagation(div);
+        return div;
+      }
+    });
+    map.addControl(new SizeControl());
+
+    // Status checkboxes
+    const statusListEl = document.getElementById('status-list');
+    const statusAllId = 'status-all';
+    statusListEl.innerHTML = `
+      <div class="status-item">
+        <span class="swatch" style="background:#888; opacity:.6"></span>
+        <input type="checkbox" id="${statusAllId}" checked />
+        <label for="${statusAllId}" style="margin:0;">(Select All)</label>
+      </div>
+      ${allStatuses.map((s, idx) => `
+        <div class="status-item">
+          <span class="swatch" style="background:${statusColor[s] || '#888'}"></span>
+          <input type="checkbox" id="status-${idx}" data-status="${encodeURIComponent(s)}" checked />
+          <label for="status-${idx}" style="margin:0;">${escapeHtml(s)}</label>
+        </div>
+      `).join('')}
+    `;
+    const statusAllEl = document.getElementById(statusAllId);
+    const statusCheckboxes = Array.from(
+      statusListEl.querySelectorAll('input[type=checkbox]')
+    ).filter(cb => cb.id !== statusAllId);
+
+    statusAllEl.addEventListener('change', () => {
+      statusCheckboxes.forEach(cb => cb.checked = statusAllEl.checked);
+      rebuild();
+    });
+    statusCheckboxes.forEach(cb => {
+      cb.addEventListener('change', () => {
+        if (!cb.checked) statusAllEl.checked = false;
+        else if (statusCheckboxes.every(c => c.checked)) statusAllEl.checked = true;
+        rebuild();
+      });
+    });
+
+    // Tech checkboxes
+    const techListEl = document.getElementById('tech-list');
+    const techAllId = 'tech-all';
+    techListEl.innerHTML = `
+      <div class="tech-item">
+        <input type="checkbox" id="${techAllId}" checked />
+        <label for="${techAllId}" style="margin:0;">(Select All)</label>
+      </div>
+      ${TECHNOLOGIES.map((t, idx) => `
+        <div class="tech-item">
+          <input type="checkbox" id="tech-${idx}" data-tech="${t.key}" checked />
+          <label for="tech-${idx}" style="margin:0;">${t.label}</label>
+        </div>
+        <div class="desc">${t.desc}</div>
+      `).join('')}
+    `;
+    const techAllEl = document.getElementById(techAllId);
+    const techCheckboxes = Array.from(
+      techListEl.querySelectorAll('input[type=checkbox]')
+    ).filter(cb => cb.id !== techAllId);
+
+    techAllEl.addEventListener('change', () => {
+      techCheckboxes.forEach(cb => cb.checked = techAllEl.checked);
+      rebuild();
+    });
+    techCheckboxes.forEach(cb => {
+      cb.addEventListener('change', () => {
+        if (!cb.checked) techAllEl.checked = false;
+        else if (techCheckboxes.every(c => c.checked)) techAllEl.checked = true;
+        rebuild();
+      });
+    });
+
+    // End-use checkboxes
+    const enduseListEl = document.getElementById('enduse-list');
+    const euAllId = 'eu-all';
+    enduseListEl.innerHTML = `
+      <div class="enduse-item">
+        <input type="checkbox" id="${euAllId}" checked />
+        <label for="${euAllId}" style="margin:0;">(Select All)</label>
+      </div>
+      ${endUses.map((eu, idx) => `
+        <div class="enduse-item">
+          <input type="checkbox" id="eu-${idx}" data-eu="${eu.key}" checked />
+          <label for="eu-${idx}" style="margin:0;">${eu.label}</label>
+        </div>
+      `).join('')}
+    `;
+    const euAllEl = document.getElementById(euAllId);
+    const euCheckboxes = Array.from(
+      enduseListEl.querySelectorAll('input[type=checkbox]')
+    ).filter(cb => cb.id !== euAllId);
+
+    euAllEl.addEventListener('change', () => {
+      euCheckboxes.forEach(cb => cb.checked = euAllEl.checked);
+      rebuild();
+    });
+    euCheckboxes.forEach(cb => {
+      cb.addEventListener('change', () => {
+        if (!cb.checked) euAllEl.checked = false;
+        else if (euCheckboxes.every(c => c.checked)) euAllEl.checked = true;
+        rebuild();
+      });
+    });
+
+    // toggle + metric
+    const metricRow    = document.getElementById('metric-row');
+    const metricSelect = document.getElementById('metric-select');
+    let currentMode    = 'points';
+    let currentMetric  = 'announced_mw';
+
+    metricSelect.addEventListener('change', () => {
+      currentMetric = metricSelect.value;
+      rebuild();
+    });
+
+    const btnCircles = document.getElementById('btn-circles');
+    const btnPoints  = document.getElementById('btn-points');
+    btnCircles.addEventListener('click', () => {
+      currentMode = 'circles';
+      btnCircles.classList.add('active');
+      btnPoints.classList.remove('active');
+      metricRow.style.display = '';
+      rebuild();
+    });
+    btnPoints.addEventListener('click', () => {
+      currentMode = 'points';
+      btnPoints.classList.add('active');
+      btnCircles.classList.remove('active');
+      metricRow.style.display = 'none';
+      rebuild();
+    });
+
+    /***********************
+     * FILTER READERS
+     ***********************/
+    function activeStatuses() {
+      return new Set(
+        statusCheckboxes
+          .filter(cb => cb.checked)
+          .map(cb => decodeURIComponent(cb.getAttribute('data-status')))
+      );
+    }
+    function activeTechs() {
+      return new Set(
+        techCheckboxes
+          .filter(cb => cb.checked)
+          .map(cb => cb.getAttribute('data-tech'))
+      );
+    }
+    function activeEndUses() {
+      return new Set(
+        euCheckboxes
+          .filter(cb => cb.checked)
+          .map(cb => cb.getAttribute('data-eu'))
+      );
+    }
+    function projectMatchesEndUse(p, euSet) {
+      if (euSet.size === 0) return false;
+      for (const key of euSet) {
+        if (p.eu && p.eu[key]) return true;
+      }
+      return false;
+    }
+    function projectMatchesTech(p, techSet) {
+      if (techSet.size === 0) return false;
+      return techSet.has(normalizeTech(p.technology));
+    }
+
+    /***********************
+     * RENDER / REBUILD
+     ***********************/
+    let projectMarkerMap = {};
+    const canvasRenderer = L.canvas({ padding: 0.5 });
+
+    function rebuild() {
+      // remove old markers from map
+      Object.values(projectMarkerMap).forEach(m => {
+        if (map.hasLayer(m)) map.removeLayer(m);
+      });
+      projectMarkerMap = {};
+
+      if (!window._mainLayer) {
+        window._mainLayer = L.layerGroup().addTo(map);
+      }
+      window._mainLayer.clearLayers();
+
+      const sSet = activeStatuses();
+      const tSet = activeTechs();
+      const eSet = activeEndUses();
+
+      const domain = computeDomain(currentMetric);
+
+      projects.forEach((p, idx) => {
+        const statusOk = sSet.has(p.status);
+        const techOk   = projectMatchesTech(p, tSet);
+        const endOk    = projectMatchesEndUse(p, eSet);
+        if (!statusOk || !techOk || !endOk) return;
+
+        const color = statusColor[p.status] || '#1f6feb';
+
+        LONG_OFFSETS.forEach(offset => {
+          const lngWrapped = p.lng + offset;
+
+          const commonOpts = {
+            renderer: canvasRenderer,
+            weight: currentMode === 'points' ? 2 : 1.25,
+            color: color,
+            opacity: 1,
+            fillColor: color,
+            fillOpacity: (currentMode === 'points') ? 0 : 0.6,
+          };
+
+          let layer;
+          if (currentMode === 'points') {
+            // bigger ring points now: radius 3.5 (was 2.2)
+            layer = L.circleMarker([p.lat, lngWrapped], {
+              ...commonOpts,
+              radius: 3.5,
+              fillOpacity: 0
+            });
+          } else {
+            const r = radiusFor(p[currentMetric], domain);
+            layer = L.circleMarker([p.lat, lngWrapped], {
+              ...commonOpts,
+              radius: r
+            });
+          }
+
+          layer.bindPopup(popupHtml(p), { maxWidth: 420 });
+          layer.addTo(window._mainLayer);
+
+          if (offset === 0) {
+            projectMarkerMap[idx] = layer;
+          }
+        });
+      });
+    }
+
+    rebuild();
+
+    /***********************
+     * SEARCH
+     ***********************/
+    const searchInput = document.getElementById('project-search-input');
+    const suggBox     = document.getElementById('search-suggestions');
+
+    const searchIndex = projects.map((p, idx) => {
+      const name = (p.name && p.name !== 'No data') ? p.name : 'Hydrogen project';
+      return {
+        idx,
+        name,
+        lower: name.toLowerCase(),
+        country: p.country || 'No data',
+        status: p.status || 'No data',
+      };
+    });
+
+    function rankMatches(query) {
+      const q = query.trim().toLowerCase();
+      if (!q) return [];
+      return searchIndex
+        .map(item => {
+          let score = -1;
+          if (item.lower.startsWith(q)) score = 2;
+          else if (item.lower.includes(q)) score = 1;
+          if (score === -1) return null;
+          const lenDiff = Math.abs(item.lower.length - q.length);
+          return { ...item, score, lenDiff };
+        })
+        .filter(Boolean)
+        .sort((a,b) => {
+          if (b.score !== a.score) return b.score - a.score;
+          if (a.lenDiff !== b.lenDiff) return a.lenDiff - b.lenDiff;
+          return a.name.localeCompare(b.name);
+        })
+        .slice(0, 8);
+    }
+
+    function renderSuggestions(list) {
+      if (!list.length) {
+        suggBox.style.display = 'none';
+        suggBox.innerHTML = '';
+        return;
+      }
+      suggBox.innerHTML = list.map(s => `
+        <div class="search-item" data-idx="${s.idx}">
+          <div class="search-main">${escapeHtml(s.name)}</div>
+          <div class="search-sub">${escapeHtml(s.country)} • ${escapeHtml(s.status)}</div>
+        </div>
+      `).join('');
+      suggBox.style.display = 'block';
+
+      Array.from(suggBox.querySelectorAll('.search-item')).forEach(el => {
+        el.addEventListener('click', () => {
+          const projIdx = parseInt(el.getAttribute('data-idx'), 10);
+          jumpToProject(projIdx);
+        });
+      });
+    }
+
+    function jumpToProject(idx) {
+      const marker = projectMarkerMap[idx];
+      const proj   = projects[idx];
+      if (!marker || !proj) return;
+
+      map.setView([proj.lat, proj.lng], Math.max(map.getZoom(), 6), { animate: true });
+      marker.openPopup();
+
+      suggBox.style.display = 'none';
+    }
+
+    searchInput.addEventListener('input', () => {
+      const q = searchInput.value;
+      const ranked = rankMatches(q);
+      renderSuggestions(ranked);
+    });
+
+    map.on('click', () => {
+      suggBox.style.display = 'none';
+    });
+  </script>
+{% endblock %}

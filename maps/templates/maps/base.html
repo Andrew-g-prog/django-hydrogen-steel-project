@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{% block title %}{% endblock %}</title>
+
+  <!-- Leaflet -->
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+  />
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""
+  ></script>
+
+  <style>
+    :root { --header-h: 56px; }
+    html, body { height: 100%; }
+    body { margin: 0; overflow: hidden; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+
+    .site-header {
+      position: fixed; top: 0; left: 0; right: 0; height: var(--header-h);
+      display: flex; align-items: center; gap: 14px;
+      padding: 0 16px; background: #111; color: #fff; z-index: 1000;
+      border-bottom: 1px solid #222;
+    }
+    .site-header strong { font-weight: 600; margin-right: 8px; }
+    .site-header a {
+      color: #bbb; text-decoration: none; padding: 6px 10px; border-radius: 8px;
+      transition: background .15s ease, color .15s ease;
+    }
+    .site-header a:hover, .site-header a.active { background: #1f1f1f; color: #fff; }
+
+    main.page {
+      position: fixed; top: var(--header-h); left: 0; right: 0; bottom: 0;
+      padding: 0;
+    }
+    .map-wrap, #map { height: 100%; width: 100%; }
+  </style>
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+  <header class="site-header">
+    <strong>Maps:</strong>
+    <a href="{% url 'map_hydrogen' %}" class="{% block tab_hydrogen %}{% endblock %}">Hydrogen</a>
+    <a href="{% url 'map_steel' %}" class="{% block tab_steel %}{% endblock %}">Steel</a>
+  </header>
+
+  <main class="page">
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

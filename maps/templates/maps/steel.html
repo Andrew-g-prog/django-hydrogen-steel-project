@@ -1,0 +1,438 @@
+{% extends "maps/base.html" %}
+{% block title %}Steel{% endblock %}
+{% block tab_steel %}active{% endblock %}
+
+{% block extra_head %}
+<style>
+  /* ===== Popup styling ===== */
+  .popup-card {
+    min-width: 340px;
+    font-size: 13px;
+    line-height: 1.45;
+  }
+  .popup-title {
+    font-weight: 800;
+    font-size: 16px;
+    margin: 0 0 6px;
+  }
+  .meta-row {
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px 8px;
+    align-items:center;
+    margin-bottom:10px;
+  }
+  .badge {
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    padding:3px 8px;
+    border-radius:999px;
+    border:1px solid #ddd;
+    font-weight:700;
+    font-size:11px;
+    letter-spacing:.2px;
+    background:#f3f4f6;
+    color:#111;
+  }
+  .badge .dot {
+    width:8px;
+    height:8px;
+    border-radius:999px;
+    background:currentColor;
+  }
+  .sub {
+    color:#4b5563;
+    font-weight:600;
+    background:#f3f4f6;
+    border-radius:6px;
+    padding:2px 6px;
+    font-size:11px;
+  }
+
+  .section-title {
+    margin:10px 0 6px;
+    font-weight:800;
+    font-size:12px;
+    text-transform:uppercase;
+    color:#111;
+    letter-spacing:.4px;
+  }
+  .spec-grid {
+    display:grid;
+    grid-template-columns:140px 1fr;
+    gap:6px 10px;
+  }
+  .spec-k {
+    color:#6b7280;
+    font-weight:700;
+  }
+  .spec-v {
+    color:#111;
+    font-weight:600;
+  }
+
+  /* ===== Marker styling (single shared color) ===== */
+  .marker-dot {
+    --c:#1f6feb;
+    position: relative;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, var(--c), #1a4fb5);
+    border: 2px solid #fff;
+    box-shadow:
+      0 0 0 2px color-mix(in srgb, var(--c) 30%, transparent),
+      0 6px 14px rgba(0,0,0,0.35);
+    transition: transform .1s ease, box-shadow .2s ease;
+  }
+  .marker-dot::after {
+    content:"";
+    position:absolute;
+    left:50%;
+    transform:translateX(-50%);
+    bottom:-6px;
+    width:0;
+    height:0;
+    border-left:6px solid transparent;
+    border-right:6px solid transparent;
+    border-top:6px solid var(--c);
+    filter: drop-shadow(0 2px 2px rgba(0,0,0,0.25));
+  }
+  .marker-dot:hover {
+    transform: scale(1.06);
+    box-shadow:
+      0 0 0 3px color-mix(in srgb, var(--c) 40%, transparent),
+      0 10px 20px rgba(0,0,0,0.4);
+  }
+
+  /* ===== Search bar (top center, same style as Hydrogen) ===== */
+  .search-wrapper {
+    position: absolute;
+    z-index: 1000;
+    top: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 320px;
+    max-width: calc(100% - 24px);
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Inter", Roboto, sans-serif;
+  }
+
+  .search-box {
+    background: rgba(17,17,17,0.92);
+    border: 1px solid #2a2a2a;
+    border-radius: 12px;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+    padding: 8px 10px;
+    color: #fff;
+  }
+  .search-box input {
+    background: transparent;
+    color: #fff;
+    border: 0;
+    outline: none;
+    width: 100%;
+    font-size: 13px;
+    line-height: 1.4;
+    padding: 0;
+  }
+  .search-box input::placeholder {
+    color: #9ca3af;
+  }
+
+  .search-suggestions {
+    background: rgba(17,17,17,0.95);
+    border: 1px solid #2a2a2a;
+    border-radius: 10px;
+    margin-top: 6px;
+    max-height: 200px;
+    overflow-y: auto;
+    box-shadow: 0 12px 24px rgba(0,0,0,0.6);
+  }
+  .search-item {
+    padding: 8px 10px;
+    cursor: pointer;
+    color: #fff;
+    font-size: 12px;
+    line-height: 1.4;
+    display: flex;
+    flex-direction: column;
+  }
+  .search-item:hover,
+  .search-item.active {
+    background: #2a2a2a;
+  }
+  .search-main {
+    font-weight: 600;
+    color: #fff;
+  }
+  .search-sub {
+    font-size: 11px;
+    color: #9ca3af;
+    margin-top: 2px;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+  <!-- Search overlay -->
+  <div class="search-wrapper">
+    <div class="search-box">
+      <input
+        id="steel-search-input"
+        type="text"
+        placeholder="Search project…"
+        autocomplete="off"
+      />
+    </div>
+    <div id="steel-search-suggestions" class="search-suggestions" style="display:none;"></div>
+  </div>
+
+  <!-- Map -->
+  <div id="map"></div>
+
+  {{ projects|json_script:"steel-data" }}
+
+  <script>
+    /***********************
+     * MAP SETUP
+     ***********************/
+    const map = L.map('map', {
+      zoomControl: true,
+      worldCopyJump: true
+    });
+
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+      maxZoom: 20,
+      attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
+    }).addTo(map);
+
+    L.control.scale({ metric: true, imperial: false }).addTo(map);
+
+    // Start centered on Europe
+    map.setView([54, 15], 4);
+
+    // Keep vertical panning sane
+    const LAT_MIN = -85, LAT_MAX = 85;
+    function clampLat(lat){
+      return Math.max(LAT_MIN, Math.min(LAT_MAX, lat));
+    }
+    map.on('moveend', () => {
+      const c = map.getCenter();
+      const clamped = clampLat(c.lat);
+      if (clamped !== c.lat) {
+        map.setView([clamped, c.lng], map.getZoom(), { animate: false });
+      }
+    });
+
+    // Duplicate markers into world copies (-360°, 0°, +360°)
+    const LONG_OFFSETS = [-360, 0, 360];
+
+    /***********************
+     * DATA
+     ***********************/
+    const projects = JSON.parse(document.getElementById('steel-data').textContent || '[]');
+
+    /***********************
+     * HELPERS
+     ***********************/
+    const MARKER_COLOR = '#1f6feb';
+
+    function escapeHtml(s){
+      s=(s==null)?'No data':String(s);
+      return s.replace(/[&<>"']/g,m=>({
+        '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+      }[m]));
+    }
+    function formatNum(x, d=2){
+      try {
+        return new Intl.NumberFormat('en-US',{maximumFractionDigits:d}).format(x);
+      } catch {
+        return String(x);
+      }
+    }
+    function coords(lat,lng){
+      return (lat!=null && lng!=null)
+        ? `${formatNum(lat,3)}°, ${formatNum(lng,3)}°`
+        : 'No data';
+    }
+    function hexToRgba(hex,a){
+      const m=/^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex||'');
+      if(!m) return `rgba(31,111,235,${a})`;
+      const r=parseInt(m[1],16),g=parseInt(m[2],16),b=parseInt(m[3],16);
+      return `rgba(${r},${g},${b},${a})`;
+    }
+
+    // marker icon (same style/color for all projects)
+    function makeMarkerIcon() {
+      return L.divIcon({
+        className: '',
+        html: `<div class="marker-dot" style="--c:${MARKER_COLOR}"></div>`,
+        iconSize: [18, 24],
+        iconAnchor: [9, 22],
+        popupAnchor: [0, -18],
+      });
+    }
+
+    function projectPopupHtml(p){
+      const title = (p.name && p.name !== 'No data') ? p.name : 'Steel project';
+      return `
+        <div class="popup-card">
+          <div class="popup-title">${escapeHtml(title)}</div>
+
+          <div class="meta-row">
+            <span class="badge" style="color:${MARKER_COLOR}; border-color:${MARKER_COLOR}; background:${hexToRgba(MARKER_COLOR,0.1)}">
+              <span class="dot"></span> ${escapeHtml(p.status)}
+            </span>
+            <span class="sub">Country: ${escapeHtml(p.country)}</span>
+            <span class="sub">Tech: ${escapeHtml(p.technology)}</span>
+          </div>
+
+          <div class="section-title">Overview</div>
+          <div class="spec-grid">
+            <div class="spec-k">Production Company</div><div class="spec-v">${escapeHtml(p.name)}</div>
+            <div class="spec-k">Order Company</div><div class="spec-v">${escapeHtml(p.order_company)}</div>
+            <div class="spec-k">Location</div><div class="spec-v">${escapeHtml(p.country)}</div>
+            <div class="spec-k">Coordinates</div><div class="spec-v">${coords(p.lat,p.lng)}</div>
+          </div>
+
+          <div class="section-title">Timeline</div>
+          <div class="spec-grid">
+            <div class="spec-k">Production Years</div><div class="spec-v">${escapeHtml(p.production_years)}</div>
+            <div class="spec-k">Expected Online</div><div class="spec-v">${escapeHtml(p.expected_date_online)}</div>
+          </div>
+
+          <div class="section-title">Capacity & Technology</div>
+          <div class="spec-grid">
+            <div class="spec-k">Capacity</div><div class="spec-v">${escapeHtml(p.capacity)}</div>
+            <div class="spec-k">Technology</div><div class="spec-v">${escapeHtml(p.technology)}</div>
+          </div>
+
+          <div class="section-title">Financials</div>
+          <div class="spec-grid">
+            <div class="spec-k">CAPEX</div><div class="spec-v">${escapeHtml(p.capex)}</div>
+          </div>
+
+          <div class="section-title">Notes</div>
+          <div>${escapeHtml(p.notes)}</div>
+        </div>
+      `;
+    }
+
+    /***********************
+     * RENDER MARKERS
+     ***********************/
+    // we'll keep references to the "main world" markers (offset 0)
+    // so search can open them
+    const mainWorldMarkers = {}; // index -> Leaflet marker
+
+    projects.forEach((p, idx) => {
+      const popupHtml = projectPopupHtml(p);
+
+      LONG_OFFSETS.forEach(offset => {
+        const lngWrapped = p.lng + offset;
+        const marker = L.marker([p.lat, lngWrapped], {
+          icon: makeMarkerIcon()
+        }).bindPopup(popupHtml, { maxWidth: 420, closeButton: true });
+
+        marker.addTo(map);
+
+        if (offset === 0) {
+          mainWorldMarkers[idx] = marker;
+        }
+      });
+    });
+
+    /***********************
+     * SEARCH / AUTOSUGGEST
+     ***********************/
+    const searchInput   = document.getElementById('steel-search-input');
+    const suggBox       = document.getElementById('steel-search-suggestions');
+
+    // Build search index (name is primary)
+    const searchIndex = projects.map((p, idx) => {
+      const name = (p.name && p.name !== 'No data') ? p.name : 'Steel project';
+      return {
+        idx,
+        name,
+        lower: name.toLowerCase(),
+        country: p.country || 'No data',
+        status: p.status || 'No data',
+      };
+    });
+
+    function rankMatches(query) {
+      const q = query.trim().toLowerCase();
+      if (!q) return [];
+
+      // score: startsWith -> 2, includes -> 1
+      // tiebreaker: shorter diff between lengths, then alphabetical
+      return searchIndex
+        .map(item => {
+          let score = -1;
+          if (item.lower.startsWith(q)) score = 2;
+          else if (item.lower.includes(q)) score = 1;
+          if (score === -1) return null;
+          const lenDiff = Math.abs(item.lower.length - q.length);
+          return { ...item, score, lenDiff };
+        })
+        .filter(Boolean)
+        .sort((a,b) => {
+          if (b.score !== a.score) return b.score - a.score;
+          if (a.lenDiff !== b.lenDiff) return a.lenDiff - b.lenDiff;
+          return a.name.localeCompare(b.name);
+        })
+        .slice(0, 8);
+    }
+
+    function renderSuggestions(list) {
+      if (!list.length) {
+        suggBox.style.display = 'none';
+        suggBox.innerHTML = '';
+        return;
+      }
+
+      suggBox.innerHTML = list.map(s => `
+        <div class="search-item" data-idx="${s.idx}">
+          <div class="search-main">${escapeHtml(s.name)}</div>
+          <div class="search-sub">
+            ${escapeHtml(s.country)} • ${escapeHtml(s.status)}
+          </div>
+        </div>
+      `).join('');
+
+      suggBox.style.display = 'block';
+
+      // attach click
+      Array.from(suggBox.querySelectorAll('.search-item')).forEach(el => {
+        el.addEventListener('click', () => {
+          const projIdx = parseInt(el.getAttribute('data-idx'), 10);
+          jumpToProject(projIdx);
+        });
+      });
+    }
+
+    function jumpToProject(idx) {
+      const marker = mainWorldMarkers[idx];
+      const proj   = projects[idx];
+      if (!marker || !proj) return;
+
+      // zoom to it and open popup
+      map.setView([proj.lat, proj.lng], Math.max(map.getZoom(), 6), { animate: true });
+      marker.openPopup();
+
+      // hide suggestions after selection
+      suggBox.style.display = 'none';
+    }
+
+    searchInput.addEventListener('input', () => {
+      const q = searchInput.value;
+      renderSuggestions(rankMatches(q));
+    });
+
+    // Clicking on the map closes suggestions
+    map.on('click', () => {
+      suggBox.style.display = 'none';
+    });
+  </script>
+{% endblock %}

@@ -1,0 +1,31 @@
+# render.yaml
+services:
+  - type: web
+    name: map-site-web
+    env: python
+    plan: free                # upgrade if needed later
+    region: frankfurt         # choose: frankfurt, london, oregon, ohio, singapore, etc.
+    branch: main
+    buildCommand: pip install -r requirements.txt && python manage.py collectstatic --noinput
+    startCommand: gunicorn map_site.wsgi:application --workers 3 --timeout 120 --log-file -
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.6
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: "False"
+      - key: RENDER
+        value: "true"
+      # optional, fill after you have a custom domain
+      # - key: ALLOWED_HOSTS
+      #   value: "yourdomain.com,www.yourdomain.com"
+      # - key: CSRF_TRUSTED_ORIGINS
+      #   value: "https://yourdomain.com,https://www.yourdomain.com"
+    healthCheckPath: /
+
+databases:
+  - name: map-site-db
+    plan: free
+    databaseName: mapsitedb
+    user: mapuser
